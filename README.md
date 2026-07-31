@@ -4,7 +4,11 @@
 scratches, reduce noise, colourise, upscale, and restore faces — as five independently reported
 pipeline stages behind a fault-tolerant job queue.
 
-**Live demo:** _pending deploy_ · **API docs:** _pending deploy_
+**Live demo:** https://smriti-web.onrender.com
+**API docs:** https://smriti-api.onrender.com/docs · **Metrics:** https://smriti-api.onrender.com/metrics
+
+Both services run on Render's free tier, which sleeps after ~15 minutes idle — the first
+request may take up to a minute to wake.
 
 > **Current status: complete and deployed, no GPU attached.** The control plane, queue, worker
 > protocol, damage detection and evaluation harness all run. What is missing is a GPU to attach, so
