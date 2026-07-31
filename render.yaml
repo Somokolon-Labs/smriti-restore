@@ -1,0 +1,90 @@
+# Render blueprint for the control plane and the frontend.
+#
+# The GPU worker is deliberately NOT here: Render has no GPU instances, and the
+# whole point of the pull architecture is that inference lives elsewhere.
+#
+# Deploy: push the repo, then New > Blueprint in the Render dashboard.
+# Set DATABASE_URL to the Neon *pooled* connection string with +asyncpg.
+
+services:
+  - type: web
+    name: smriti-api
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+
+      # Neon pooled URL, e.g.
+      # postgresql+asyncpg://user:pass@ep-xxx-pooler.region.aws.neon.tech/smriti?ssl=require
+      - key: DATABASE_URL
+        sync: false
+
+      # bytea storage needs no extra credentials and survives Render's ephemeral
+      # filesystem. Retention keeps it bounded.
+      - key: STORAGE_BACKEND
+        value: postgres
+
+      - key: WORKER_API_KEYS
+        generateValue: true
+      - key: ADMIN_API_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+
+      - key: PUBLIC_JOBS_PER_HOUR
+        value: "12"
+      - key: PUBLIC_JOBS_PER_DAY
+        value: "40"
+      - key: MAX_QUEUE_DEPTH
+        value: "120"
+
+      # Restoration pipelines are long, so the lease is generous compared with a
+      # single-shot generation queue.
+      - key: JOB_LEASE_SECONDS
+        value: "180"
+      - key: JOB_MAX_ATTEMPTS
+        value: "3"
+      - key: WORKER_OFFLINE_AFTER_SECONDS
+        value: "45"
+      - key: CLAIM_LONG_POLL_SECONDS
+        value: "25"
+
+      - key: MAX_SOURCE_PIXELS
+        value: "4000000"
+      - key: MAX_RESULT_PIXELS
+        value: "32000000"
+
+      # Personal photographs expire fast; the curated showcase is exempt.
+      - key: PRIVATE_RETENTION_HOURS
+        value: "48"
+      - key: IMAGE_RETENTION_DAYS
+        value: "30"
+      - key: IMAGE_MAX_COUNT
+        value: "1200"
+
+  - type: web
+    name: smriti-web
+    runtime: node
+    rootDir: web
+    plan: free
+    region: singapore
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # NEXT_PUBLIC_* are inlined at build time, so they must be set before the
+      # build step rather than only at runtime.
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false

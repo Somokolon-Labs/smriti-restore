@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink text-cotton font-sans antialiased;
+    background-image:
+      radial-gradient(70rem 40rem at 15% -10%, rgba(29, 53, 87, 0.28), transparent 60%),
+      radial-gradient(50rem 35rem at 95% 0%, rgba(164, 36, 59, 0.18), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    @apply bg-turmeric/30 text-cotton;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-turmeric/70 ring-offset-2 ring-offset-ink;
+  }
+
+  /* Respect users who ask for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .surface {
+    @apply rounded-card border border-ink-line bg-ink-soft/80 shadow-lift backdrop-blur-sm;
+  }
+
+  .label {
+    @apply font-mono text-[11px] uppercase tracking-[0.16em] text-cotton-faint;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-transparent
+      px-4 py-2 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .btn-primary {
+    @apply btn bg-turmeric text-ink hover:bg-turmeric/90;
+  }
+
+  .btn-ghost {
+    @apply btn border-ink-line text-cotton-dim hover:border-cotton-faint hover:text-cotton;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-ink-line bg-ink/70 px-3 py-2 text-sm text-cotton
+      placeholder:text-cotton-faint/70 focus:border-turmeric/60;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-line bg-ink-raised/70
+      px-2.5 py-1 font-mono text-[11px] tracking-wide text-cotton-dim;
+  }
+
+  /* Thin stitched divider, echoing a kantha running stitch. */
+  .stitch-rule {
+    height: 1px;
+    background-image: linear-gradient(
+      to right,
+      rgba(239, 231, 215, 0.28) 0 10px,
+      transparent 10px 18px
+    );
+    background-size: 18px 1px;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-ink-raised;
+  }
+
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgba(239, 231, 215, 0.06),
+      transparent
+    );
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Native range input styled to match the dark surface. */
+  input[type="range"] {
+    @apply h-1 w-full cursor-pointer appearance-none rounded-full bg-ink-line;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    @apply h-4 w-4 appearance-none rounded-full border-2 border-ink bg-turmeric;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    @apply h-4 w-4 rounded-full border-2 border-ink bg-turmeric;
+  }
+}

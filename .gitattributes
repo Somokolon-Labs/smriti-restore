@@ -1,0 +1,25 @@
+* text=auto eol=lf
+
+# Shell scripts must keep LF or they break on Linux hosts (RunPod, Docker, CI).
+*.sh text eol=lf
+
+# Windows-only helpers
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.safetensors binary
+*.ckpt binary
+*.pt binary
+*.bin binary
+*.ico binary
+
+# Keep generated lockfiles out of diffs
+package-lock.json linguist-generated=true -diff
+
+# Notebooks: no merge attempts
+*.ipynb -merge linguist-documentation=false

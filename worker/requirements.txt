@@ -1,0 +1,28 @@
+# GPU worker dependencies.
+#
+# torch/torchvision are pinned but NOT tied to an index here, so the same file
+# works on CUDA, ROCm and CPU hosts. Install the matching wheels first:
+#
+#   CUDA 12.1:
+#     pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+#   CPU only (protocol testing; far too slow for real restoration):
+#     pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+#
+# then:  pip install -r worker/requirements.txt
+
+torch==2.5.1
+torchvision==0.20.1
+
+diffusers==0.32.2
+transformers==4.48.0
+accelerate==1.2.1
+safetensors==0.5.2
+huggingface-hub==0.27.1
+
+# Damage detection and face detection are classical CV, not learned models:
+# cheap, deterministic, and no extra weights to download.
+opencv-python-headless==4.10.0.84
+
+Pillow==11.0.0
+numpy==2.2.6
+httpx==0.28.1

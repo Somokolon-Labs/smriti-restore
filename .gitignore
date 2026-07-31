@@ -1,0 +1,79 @@
+# ---- secrets ----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+# Scratch files from deployment scripts; some hold connection strings.
+scripts/_*
+
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.sqlite
+*.sqlite3
+*.db
+# SQLite WAL mode writes these sidecars next to the database.
+*.db-shm
+*.db-wal
+*.db-journal
+
+# ---- node / next ----
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+.turbo/
+
+# ---- data & model artifacts (large) ----
+data/raw/
+data/interim/
+data/contact_sheets/
+
+# The images themselves are hundreds of MB and reproducible from the scripts.
+# The manifest, attribution and summary are small and are what make the dataset
+# inspectable and reproducible, so those are tracked.
+data/pairs/*
+!data/pairs/manifest.json
+!data/pairs/summary.json
+!data/pairs/ATTRIBUTION.json
+outputs/
+checkpoints/
+models/
+*.safetensors
+*.ckpt
+*.pt
+*.bin
+!ml/prompts/*.json
+
+# ---- storage backend (local files) ----
+storage/
+api/storage/
+
+# ---- eval artifacts (results.json IS committed) ----
+eval/runs/
+eval/samples/
+
+# ---- caches ----
+.cache/
+hf_cache/
+.huggingface/
+
+# ---- os / editor ----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json

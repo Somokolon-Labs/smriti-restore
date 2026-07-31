@@ -1,0 +1,17 @@
+# Degradation synthesis and reference-based evaluation.
+# Install the CUDA torch wheels first (see worker/requirements.txt), then:
+#   pip install -r ml/requirements.txt
+
+diffusers==0.32.2
+transformers==4.48.0
+accelerate==1.2.1
+safetensors==0.5.2
+
+# PSNR and SSIM are implemented directly against OpenCV rather than pulled from
+# scikit-image: fewer dependencies, and the windowing is explicit where the
+# numbers end up on a model card.
+opencv-python-headless==4.10.0.84
+Pillow==11.0.0
+numpy==2.2.6
+tqdm==4.67.1
+httpx==0.28.1
