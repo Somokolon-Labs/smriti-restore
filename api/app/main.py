@@ -93,9 +93,36 @@ async def _retention_loop() -> None:
             log.exception("retention iteration failed")
 
 
+async def _init_db_tolerantly(attempts: int = 3) -> bool:
+    """Create the schema, but never let a database blip prevent boot.
+
+    A container that refuses to start when Postgres is briefly unreachable
+    crash-loops and takes the whole service down, which is strictly worse than
+    starting up and reporting itself not-ready. Liveness stays green, readiness
+    returns 503, and the operator gets a diagnosable process instead of a
+    restart loop.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            await init_db()
+            return True
+        except Exception as exc:
+            if attempt == attempts:
+                log.error(
+                    "database unreachable after %d attempts (%s); starting in a "
+                    "degraded state — /health stays up, /health/ready will report 503",
+                    attempts,
+                    exc,
+                )
+                return False
+            log.warning("database init failed (attempt %d/%d): %s", attempt, attempts, exc)
+            await asyncio.sleep(2 * attempt)
+    return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    await init_db()
+    await _init_db_tolerantly()
     tasks = [
         asyncio.create_task(_reaper_loop(), name="lease-reaper"),
         asyncio.create_task(_retention_loop(), name="retention"),

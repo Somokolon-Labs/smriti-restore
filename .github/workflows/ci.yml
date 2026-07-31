@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Control plane
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite+aiosqlite:///./ci.db
+      WORKER_API_KEYS: ci_worker_key
+      ADMIN_API_KEY: ci_admin_key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r api/requirements.txt
+          pip install ruff==0.9.2
+
+      - name: Lint
+        run: ruff check api worker ml scripts
+
+      - name: Format check
+        run: ruff format --check api worker ml scripts
+
+      - name: Route check
+        working-directory: api
+        run: |
+          python - <<'PY'
+          from app.main import app
+          paths = sorted({getattr(r, "path", "") for r in app.routes})
+          for required in (
+              "/health",
+              "/health/ready",
+              "/v1/jobs",
+              "/v1/uploads",
+              "/v1/profiles",
+              "/v1/stages",
+              "/v1/showcase",
+              "/v1/worker/claim",
+          ):
+              assert required in paths, f"missing route {required}"
+          print(f"{len(paths)} routes registered")
+          PY
+
+      - name: Boot and smoke the API
+        working-directory: api
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/health && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8000/health | grep -q '"status":"ok"'
+          curl -fsS http://127.0.0.1:8000/v1/profiles | grep -q full_restore
+          curl -fsS http://127.0.0.1:8000/v1/stages | grep -q face_enhance
+          curl -fsS http://127.0.0.1:8000/v1/status | grep -q available_stages
+          curl -fsS http://127.0.0.1:8000/metrics | grep -q smriti_queue_depth
+          curl -fsS -o /dev/null http://127.0.0.1:8000/openapi.json
+
+      - name: Liveness must not depend on the database
+        working-directory: api
+        env:
+          # Point at an unreachable host: /health must still answer, because a
+          # liveness probe that fails when the database naps causes restart loops.
+          DATABASE_URL: postgresql+asyncpg://nobody:nobody@127.0.0.1:1/absent
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8002 &
+          sleep 8
+          curl -fsS http://127.0.0.1:8002/health | grep -q '"status":"ok"'
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8002/health/ready)
+          test "$code" = "503" || { echo "readiness should be 503, got $code"; exit 1; }
+          echo "liveness stayed up while readiness correctly reported 503"
+
+      - name: Reject unauthenticated worker calls
+        working-directory: api
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8001 &
+          sleep 6
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            http://127.0.0.1:8001/v1/worker/claim \
+            -H 'Content-Type: application/json' -d '{"worker_id":"x"}')
+          test "$code" = "401" || { echo "expected 401, got $code"; exit 1; }
+          echo "unauthenticated claim correctly rejected"
+
+  imaging:
+    name: Imaging layer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # The classical layer needs no GPU and no model weights, so its measured
+      # behaviour is checked on every push.
+      - name: Install
+        run: pip install opencv-python-headless==4.10.0.84 Pillow==11.0.0 numpy==2.2.6
+
+      - name: Damage detection and compositing
+        run: |
+          python scripts/check_imaging.py | tee imaging.txt
+          python - <<'PY'
+          import re
+          report = open("imaging.txt").read()
+          recall = float(re.search(r"recall=([\d.]+)", report).group(1))
+          clean = float(re.search(r"clean image\s*: flagged ([\d.]+)%", report).group(1))
+          assert recall >= 0.90, f"damage recall regressed to {recall}"
+          assert clean <= 0.05, f"false positives on a clean frame: {clean}%"
+          print(f"recall={recall} clean_false_positives={clean}%")
+          PY
+
+  web:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Build
+        env:
+          NEXT_PUBLIC_API_URL: https://smriti-api.onrender.com
+        run: npm run build
+
+  docker:
+    name: Container build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the control plane image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: api/Dockerfile
+          push: false
+          load: true
+          tags: smriti-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Health check the built image
+        run: |
+          docker run -d --name api-ci -p 8000:8000 \
+            -e DATABASE_URL=sqlite+aiosqlite:///./ci.db \
+            -e WORKER_API_KEYS=ci_worker_key \
+            -e ADMIN_API_KEY=ci_admin_key \
+            smriti-api:ci
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/health | grep -q '"status":"ok"'
+          docker logs api-ci
+          docker rm -f api-ci
